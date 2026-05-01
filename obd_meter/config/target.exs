@@ -43,7 +43,7 @@ config :mdns_lite,
 
 config :obd_pi4, :viewport, %{
   name: :main_viewport,
-  size: {1280, 720},
+  size: {1920, 1080},
   theme: :dark,
   default_scene: {ObdPi4.Ui.Scene.Dashboard, nil},
   drivers: [
