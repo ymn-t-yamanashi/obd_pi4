@@ -63,7 +63,6 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
     graph =
       Graph.build()
       |> rect({1280, 720}, fill: {9, 13, 24})
-      |> draw_panel_grid(centers)
       |> Gauge.put(
         center: Enum.at(centers, 0),
         radius: @gauge_radius,
@@ -135,19 +134,11 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
     wrapped - :math.floor(wrapped)
   end
 
-  defp draw_panel_grid(graph, centers) do
-    Enum.reduce(centers, graph, fn {cx, cy}, acc ->
-      acc
-      |> rect({280, 260}, translate: {cx - 140, cy - 130}, stroke: {2, {45, 68, 102}})
-    end)
-  end
-
   defp draw_status_card(graph, {cx, cy}, connected) do
     {label, color} =
       if connected, do: {"CONNECTED", {65, 201, 120}}, else: {"DISCONNECTED", {220, 90, 90}}
 
     graph
-    |> rect({280, 260}, translate: {cx - 140, cy - 130}, fill: {20, 28, 45}, stroke: {2, {58, 86, 126}})
     |> text("OBD STATUS", translate: {cx, cy - 30}, text_align: :center, font_size: 28, fill: :white)
     |> text(label, translate: {cx, cy + 20}, text_align: :center, font_size: 34, fill: color)
   end
