@@ -52,10 +52,10 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
       |> draw_ticks()
       |> line({{cx, cy}, {nx, ny}}, stroke: {8, {248, 95, 95}})
       |> circle(12, translate: @center, fill: :white)
-      |> text("RPM", translate: {605, 430}, font_size: 34, fill: :white)
+      |> text("RPM", translate: {cx, 430}, text_align: :center, font_size: 34, fill: :white)
       |> text(Integer.to_string(rpm),
-        translate: {690, 485},
-        text_align: :right,
+        translate: {cx, 485},
+        text_align: :center,
         font_size: 64,
         fill: {255, 220, 120}
       )
