@@ -5,7 +5,7 @@ defmodule ObdPi4.Obd.Reader do
   alias ObdPi4.Obd.Parser
   alias ObdPi4.Obd.State
 
-  @interval_ms 200
+  @interval_ms 50
   @uart_speed 115_200
   @open_retry_ms 1_000
   @pid_map %{
@@ -15,6 +15,7 @@ defmodule ObdPi4.Obd.Reader do
     "010B" => :map_kpa,
     "0142" => :battery_v
   }
+  @pid_order ["010C", "0105", "010E", "010B", "0142"]
   @init_cmds ["ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP0"]
 
   def start_link(_opts), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -22,7 +23,13 @@ defmodule ObdPi4.Obd.Reader do
   @impl true
   def init(_arg) do
     {:ok, uart} = UART.start_link()
-    state = %{uart: uart, device: System.get_env("OBD_DEVICE", "/dev/ttyUSB0"), ready: false}
+    state = %{
+      uart: uart,
+      device: System.get_env("OBD_DEVICE", "/dev/ttyUSB0"),
+      ready: false,
+      pid_index: 0
+    }
+
     send(self(), :connect)
     {:ok, state}
   end
@@ -34,7 +41,7 @@ defmodule ObdPi4.Obd.Reader do
         if init_adapter(state.uart) do
           State.set_status(:connected)
           Process.send_after(self(), :poll, @interval_ms)
-          {:noreply, %{state | ready: true}}
+          {:noreply, %{state | ready: true, pid_index: 0}}
         else
           UART.close(state.uart)
           State.set_status(:disconnected)
@@ -50,27 +57,29 @@ defmodule ObdPi4.Obd.Reader do
   end
 
   @impl true
-  def handle_info(:poll, %{ready: true} = state) do
-    values =
-      @pid_map
-      |> Enum.reduce(%{}, fn {pid, key}, acc ->
-        case query_pid(state.uart, pid) do
-          {:ok, val} -> Map.put(acc, key, val)
-          _ -> acc
-        end
-      end)
+  def handle_info(:poll, %{ready: true, pid_index: idx} = state) do
+    pid = Enum.at(@pid_order, idx)
+    next_idx = rem(idx + 1, length(@pid_order))
 
-    case map_size(values) do
-      0 ->
-        UART.close(state.uart)
-        State.set_status(:disconnected)
-        Process.send_after(self(), :connect, @open_retry_ms)
-        {:noreply, %{state | ready: false}}
+    case query_pid(state.uart, pid) do
+      {:ok, val} ->
+        key = Map.fetch!(@pid_map, pid)
+        %{key => val} |> Parser.normalize() |> State.put()
+        Process.send_after(self(), :poll, @interval_ms)
+        {:noreply, %{state | pid_index: next_idx}}
 
       _ ->
-        values |> Parser.normalize() |> State.put()
-        Process.send_after(self(), :poll, @interval_ms)
-        {:noreply, state}
+        if pid == "010C" do
+          # RPM失敗は接続断の可能性が高いので即再接続
+          UART.close(state.uart)
+          State.set_status(:disconnected)
+          Process.send_after(self(), :connect, @open_retry_ms)
+          {:noreply, %{state | ready: false}}
+        else
+          # 一時的な失敗は他PIDを継続
+          Process.send_after(self(), :poll, @interval_ms)
+          {:noreply, %{state | pid_index: next_idx}}
+        end
     end
   end
 
@@ -81,7 +90,7 @@ defmodule ObdPi4.Obd.Reader do
 
   defp init_adapter(uart) do
     Enum.all?(@init_cmds, fn cmd ->
-      case command(uart, cmd, 2_000) do
+      case command(uart, cmd, 800) do
         {:ok, _} -> true
         _ -> false
       end
@@ -89,7 +98,7 @@ defmodule ObdPi4.Obd.Reader do
   end
 
   defp query_pid(uart, pid) do
-    with {:ok, response} <- command(uart, pid, 1_000),
+    with {:ok, response} <- command(uart, pid, 120),
          {:ok, value} <- Parser.parse_pid(pid, response) do
       {:ok, value}
     end
