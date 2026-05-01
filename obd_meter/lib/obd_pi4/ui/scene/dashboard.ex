@@ -8,7 +8,7 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
   import Scenic.Primitives
 
   @tick_ms 50
-  @gauge_radius 95
+  @gauge_radius 155
 
   @impl true
   def init(scene, _param, _opts) do
@@ -52,12 +52,12 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
 
   defp render(scene) do
     centers = [
-      {220, 200},
-      {640, 200},
-      {1060, 200},
-      {220, 520},
-      {640, 520},
-      {1060, 520}
+      {213, 180},
+      {640, 180},
+      {1067, 180},
+      {213, 540},
+      {640, 540},
+      {1067, 540}
     ]
 
     graph =
