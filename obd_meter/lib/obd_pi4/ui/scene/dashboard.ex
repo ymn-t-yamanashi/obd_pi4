@@ -10,8 +10,9 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
   @center {640, 360}
   @radius 220
   @needle_len 180
-  @min_deg -130
-  @max_deg 130
+  # 0rpmを左下、最大側を右下に寄せる一般的な車載メーター風の角度
+  @start_deg 150
+  @end_deg 30
 
   @impl true
   def init(scene, _param, _opts) do
@@ -39,7 +40,7 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
 
   defp render(scene) do
     {cx, cy} = @center
-    angle = @min_deg + scene.assigns.value * (@max_deg - @min_deg)
+    angle = gauge_angle(scene.assigns.value)
     {nx, ny} = polar(@center, @needle_len, angle)
 
     graph =
@@ -56,7 +57,7 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
 
   defp draw_ticks(graph) do
     Enum.reduce(0..10, graph, fn i, acc ->
-      deg = @min_deg + i * ((@max_deg - @min_deg) / 10)
+      deg = gauge_angle(i / 10)
       p1 = polar(@center, @radius - 10, deg)
       p2 = polar(@center, @radius - 35, deg)
       line(acc, {p1, p2}, stroke: {4, {159, 199, 255}})
@@ -78,4 +79,12 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
       true -> {next, dir}
     end
   end
+
+  defp gauge_angle(value) do
+    span = rem(@end_deg - @start_deg + 360, 360)
+    normalize_deg(@start_deg + value * span)
+  end
+
+  defp normalize_deg(deg) when deg > 180, do: deg - 360
+  defp normalize_deg(deg), do: deg
 end
