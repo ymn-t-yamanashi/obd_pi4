@@ -4,15 +4,12 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
   use Scenic.Scene
 
   alias Scenic.Graph
+  alias ObdPi4.Ui.Gauge
   import Scenic.Primitives
 
   @tick_ms 50
   @center {640, 360}
   @radius 220
-  @needle_len 180
-  @start_deg 150
-  @end_deg 30
-  @max_rpm 9000
 
   @impl true
   def init(scene, _param, _opts) do
@@ -39,42 +36,20 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
   end
 
   defp render(scene) do
-    {cx, cy} = @center
-    angle = gauge_angle(scene.assigns.value)
-    {nx, ny} = polar(@center, @needle_len, angle)
-    rpm = trunc(scene.assigns.value * @max_rpm)
-
     graph =
       Graph.build()
       |> rect({1280, 720}, fill: {9, 13, 24})
-      |> circle(@radius + 20, translate: @center, stroke: {4, {109, 224, 255}})
-      |> circle(@radius, translate: @center, fill: {17, 26, 45})
-      |> draw_ticks()
-      |> line({{cx, cy}, {nx, ny}}, stroke: {8, {248, 95, 95}})
-      |> circle(12, translate: @center, fill: :white)
-      |> text("RPM", translate: {cx, 430}, text_align: :center, font_size: 34, fill: :white)
-      |> text(Integer.to_string(rpm),
-        translate: {cx, 485},
-        text_align: :center,
-        font_size: 64,
-        fill: {255, 220, 120}
+      |> Gauge.put(
+        center: @center,
+        radius: @radius,
+        value: scene.assigns.value,
+        min: 0,
+        max: 9000,
+        unit: "RPM",
+        formatter: fn v -> Integer.to_string(trunc(v)) end
       )
 
     push_graph(scene, graph)
-  end
-
-  defp draw_ticks(graph) do
-    Enum.reduce(0..10, graph, fn i, acc ->
-      deg = gauge_angle(i / 10)
-      p1 = polar(@center, @radius - 10, deg)
-      p2 = polar(@center, @radius - 35, deg)
-      line(acc, {p1, p2}, stroke: {4, {159, 199, 255}})
-    end)
-  end
-
-  defp polar({cx, cy}, r, deg) do
-    rad = :math.pi() * deg / 180
-    {cx + r * :math.cos(rad), cy + r * :math.sin(rad)}
   end
 
   defp next_value(value, dir) do
@@ -88,11 +63,4 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
     end
   end
 
-  defp gauge_angle(value) do
-    span = rem(@end_deg - @start_deg + 360, 360)
-    normalize_deg(@start_deg + value * span)
-  end
-
-  defp normalize_deg(deg) when deg > 180, do: deg - 360
-  defp normalize_deg(deg), do: deg
 end
