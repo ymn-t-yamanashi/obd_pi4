@@ -8,7 +8,8 @@ defmodule ObdPi4.Application do
     children =
       [
         {Scenic, []},
-        ObdPi4.Ui.Bootstrapper
+        ObdPi4.Ui.Bootstrapper,
+        ObdPi4.Ui.CursorHider
       ] ++ validation_child() ++ target_children()
 
     opts = [strategy: :one_for_one, name: ObdPi4.Supervisor]
