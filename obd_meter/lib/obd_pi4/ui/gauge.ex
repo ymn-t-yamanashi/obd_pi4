@@ -17,6 +17,7 @@ defmodule ObdPi4.Ui.Gauge do
     value = Keyword.get(opts, :value, 0.0) |> clamp(0.0, 1.0)
     min_value = Keyword.get(opts, :min, 0)
     max_value = Keyword.get(opts, :max, 100)
+    title = Keyword.get(opts, :title, "")
     unit = Keyword.get(opts, :unit, "")
     formatter = Keyword.get(opts, :formatter, &default_formatter/1)
 
@@ -28,6 +29,11 @@ defmodule ObdPi4.Ui.Gauge do
     tick_color = Keyword.get(opts, :tick_color, @default_tick)
     needle_color = Keyword.get(opts, :needle_color, @default_needle)
     value_color = Keyword.get(opts, :value_color, @default_value)
+    title_color = Keyword.get(opts, :title_color, :white)
+    unit_color = Keyword.get(opts, :unit_color, {216, 229, 255})
+    title_size = Keyword.get(opts, :title_size, max(trunc(radius * 0.16), 16))
+    value_size = Keyword.get(opts, :value_size, max(trunc(radius * 0.28), 24))
+    unit_size = Keyword.get(opts, :unit_size, max(trunc(radius * 0.14), 14))
 
     current = scale_value(value, min_value, max_value)
     display_value = formatter.(current)
@@ -41,12 +47,23 @@ defmodule ObdPi4.Ui.Gauge do
     |> draw_ticks(center, radius, start_deg, end_deg, tick_color)
     |> line({{cx, cy}, {nx, ny}}, stroke: {8, needle_color})
     |> circle(12, translate: center, fill: :white)
-    |> text(unit, translate: {cx, cy + trunc(radius * 0.32)}, text_align: :center, font_size: 34, fill: :white)
-    |> text(display_value,
-      translate: {cx, cy + trunc(radius * 0.57)},
+    |> text(title,
+      translate: {cx, cy + trunc(radius * -0.32)},
       text_align: :center,
-      font_size: 64,
+      font_size: title_size,
+      fill: title_color
+    )
+    |> text(display_value,
+      translate: {cx, cy + trunc(radius * 0.48)},
+      text_align: :center,
+      font_size: value_size,
       fill: value_color
+    )
+    |> text(unit,
+      translate: {cx, cy + trunc(radius * 0.7)},
+      text_align: :center,
+      font_size: unit_size,
+      fill: unit_color
     )
   end
 
