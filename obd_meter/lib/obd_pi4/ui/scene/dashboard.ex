@@ -10,9 +10,9 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
   @center {640, 360}
   @radius 220
   @needle_len 180
-  # 0rpmを左下、最大側を右下に寄せる一般的な車載メーター風の角度
   @start_deg 150
   @end_deg 30
+  @max_rpm 9000
 
   @impl true
   def init(scene, _param, _opts) do
@@ -42,6 +42,7 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
     {cx, cy} = @center
     angle = gauge_angle(scene.assigns.value)
     {nx, ny} = polar(@center, @needle_len, angle)
+    rpm = trunc(scene.assigns.value * @max_rpm)
 
     graph =
       Graph.build()
@@ -51,6 +52,13 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
       |> draw_ticks()
       |> line({{cx, cy}, {nx, ny}}, stroke: {8, {248, 95, 95}})
       |> circle(12, translate: @center, fill: :white)
+      |> text("RPM", translate: {605, 430}, font_size: 34, fill: :white)
+      |> text(Integer.to_string(rpm),
+        translate: {690, 485},
+        text_align: :right,
+        font_size: 64,
+        fill: {255, 220, 120}
+      )
 
     push_graph(scene, graph)
   end
