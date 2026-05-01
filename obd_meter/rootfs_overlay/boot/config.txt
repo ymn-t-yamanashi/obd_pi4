@@ -1,0 +1,7 @@
+# Force HDMI0 output for kiosk display
+hdmi_force_hotplug:0=1
+hdmi_group:0=1
+hdmi_mode:0=16
+
+# Keep output stable on various displays
+disable_overscan=1

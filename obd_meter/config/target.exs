@@ -1,6 +1,6 @@
 import Config
 
-config :logger, backends: [RingLogger]
+config :logger, :default_handler, false
 
 config :shoehorn, init: [:nerves_runtime, :nerves_pack]
 
@@ -44,12 +44,14 @@ config :mdns_lite,
 config :obd_pi4, :viewport, %{
   name: :main_viewport,
   size: {1280, 720},
+  theme: :dark,
   default_scene: {ObdPi4.Ui.Scene.Dashboard, nil},
   drivers: [
     [
       module: Scenic.Driver.Local,
+      layer: 2,
       cursor: false,
-      limit_ms: 50,
+      limit_ms: 33,
       antialias: false,
       position: [scaled: true, centered: true, orientation: :normal]
     ]
