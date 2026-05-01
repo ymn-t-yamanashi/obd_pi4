@@ -8,6 +8,7 @@ defmodule ObdPi4.Obd.State do
   def get, do: GenServer.call(__MODULE__, :get)
 
   def put(values) when is_map(values), do: GenServer.cast(__MODULE__, {:put, values})
+  def set_status(status) when status in [:connected, :disconnected], do: GenServer.cast(__MODULE__, {:status, status})
 
   @impl true
   def init(_arg) do
@@ -33,5 +34,10 @@ defmodule ObdPi4.Obd.State do
       |> Map.put(:status, :connected)
 
     {:noreply, next_state}
+  end
+
+  @impl true
+  def handle_cast({:status, status}, state) do
+    {:noreply, Map.put(state, :status, status)}
   end
 end

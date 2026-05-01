@@ -7,6 +7,8 @@ defmodule ObdPi4.Application do
   def start(_type, _args) do
     children =
       [
+        ObdPi4.Obd.State,
+        ObdPi4.Obd.Reader,
         {Scenic, []},
         ObdPi4.Ui.Bootstrapper,
         ObdPi4.Ui.CursorHider

@@ -1,8 +1,5 @@
 defmodule ObdPi4.Obd.Parser do
-  @moduledoc """
-  OBDレスポンス解析の入口。
-  現時点ではMVP向けに値マップをそのまま受け取り、異常値を最小限クリップする。
-  """
+  @moduledoc false
 
   @rpm_range 0..9000
   @coolant_range -20..120
@@ -18,6 +15,40 @@ defmodule ObdPi4.Obd.Parser do
       map_kpa: clamp_int(values[:map_kpa], @map_range),
       battery_v: clamp_float(values[:battery_v], @battery_range)
     }
+  end
+
+  def parse_pid(pid, response) when is_binary(pid) and is_binary(response) do
+    with {:ok, bytes} <- extract_bytes(response),
+         {:ok, value} <- decode(pid, bytes) do
+      {:ok, value}
+    end
+  end
+
+  defp decode("010C", [0x41, 0x0C, a, b | _]), do: {:ok, trunc((a * 256 + b) / 4)}
+  defp decode("0105", [0x41, 0x05, a | _]), do: {:ok, a - 40}
+  defp decode("010E", [0x41, 0x0E, a | _]), do: {:ok, trunc(a / 2 - 64)}
+  defp decode("010B", [0x41, 0x0B, a | _]), do: {:ok, a}
+  defp decode("0142", [0x41, 0x42, a, b | _]), do: {:ok, Float.round((a * 256 + b) / 1000, 2)}
+  defp decode(_, _), do: {:error, :unexpected_payload}
+
+  defp extract_bytes(response) do
+    clean =
+      response
+      |> String.upcase()
+      |> String.replace(~r/SEARCHING\.\.\./, "")
+      |> String.replace(~r/[^0-9A-F]/, "")
+
+    if rem(byte_size(clean), 2) != 0 or clean == "" do
+      {:error, :invalid_hex}
+    else
+      bytes =
+        clean
+        |> String.codepoints()
+        |> Enum.chunk_every(2)
+        |> Enum.map(fn [a, b] -> String.to_integer(a <> b, 16) end)
+
+      {:ok, bytes}
+    end
   end
 
   defp clamp_int(nil, _range), do: nil

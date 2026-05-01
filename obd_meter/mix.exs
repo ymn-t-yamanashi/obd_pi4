@@ -38,6 +38,7 @@ defmodule ObdPi4.MixProject do
       {:nerves_runtime, "~> 0.13.12"},
       {:nerves_pack, "~> 0.7.1", targets: @all_targets},
       {:nerves_system_rpi4, "~> 2.0", runtime: false, targets: :rpi4},
+      {:circuits_uart, "~> 1.5"},
       {:scenic, "~> 0.11.2"},
       {:scenic_driver_local,
        github: "ScenicFramework/scenic_driver_local",

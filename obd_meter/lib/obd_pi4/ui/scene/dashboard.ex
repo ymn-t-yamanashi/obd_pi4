@@ -3,6 +3,7 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
 
   use Scenic.Scene
 
+  alias ObdPi4.Obd.State
   alias Scenic.Graph
   alias ObdPi4.Ui.Gauge
   import Scenic.Primitives
@@ -15,12 +16,11 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
     scene =
       scene
       |> assign(
-        rpm: 0.0,
-        temp: 0.0,
-        ign: 0.0,
-        map: 0.0,
-        volt: 0.0,
-        dir: 1,
+        rpm: nil,
+        temp: nil,
+        ign: nil,
+        map: nil,
+        volt: nil,
         connected: false
       )
       |> render()
@@ -31,18 +31,17 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
 
   @impl true
   def handle_info(:tick, scene) do
-    {base, dir} = next_value(scene.assigns.rpm, scene.assigns.dir)
+    obd = State.get()
 
     scene =
       scene
       |> assign(
-        rpm: base,
-        temp: wave(base, 0.25),
-        ign: wave(base, 0.50),
-        map: wave(base, 0.75),
-        volt: wave(base, 0.12),
-        dir: dir,
-        connected: true
+        rpm: obd[:rpm],
+        temp: obd[:coolant_temp_c],
+        ign: obd[:ignition_advance_deg],
+        map: obd[:map_kpa],
+        volt: obd[:battery_v],
+        connected: obd[:status] == :connected
       )
       |> render()
 
@@ -66,72 +65,56 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
       |> Gauge.put(
         center: Enum.at(centers, 0),
         radius: @gauge_radius,
-        value: scene.assigns.rpm,
+        value: normalize(scene.assigns.rpm, 0, 9000),
         min: 0,
         max: 9000,
         title: "ENGINE RPM",
         unit: "rpm",
-        formatter: fn v -> Integer.to_string(trunc(v)) end
+        formatter: fn _v -> maybe_int(scene.assigns.rpm) end
       )
       |> Gauge.put(
         center: Enum.at(centers, 1),
         radius: @gauge_radius,
-        value: scene.assigns.temp,
+        value: normalize(scene.assigns.temp, -20, 120),
         min: -20,
         max: 120,
         title: "COOLANT TEMP",
         unit: "C",
-        formatter: fn v -> Integer.to_string(trunc(v)) end
+        formatter: fn _v -> maybe_int(scene.assigns.temp) end
       )
       |> Gauge.put(
         center: Enum.at(centers, 2),
         radius: @gauge_radius,
-        value: scene.assigns.ign,
+        value: normalize(scene.assigns.ign, -10, 45),
         min: -10,
         max: 45,
         title: "IGNITION ADV",
         unit: "deg",
-        formatter: fn v -> Integer.to_string(trunc(v)) end
+        formatter: fn _v -> maybe_int(scene.assigns.ign) end
       )
       |> Gauge.put(
         center: Enum.at(centers, 3),
         radius: @gauge_radius,
-        value: scene.assigns.map,
+        value: normalize(scene.assigns.map, 20, 101),
         min: 20,
         max: 101,
         title: "MANIFOLD ABS",
         unit: "kPa",
-        formatter: fn v -> Integer.to_string(trunc(v)) end
+        formatter: fn _v -> maybe_int(scene.assigns.map) end
       )
       |> Gauge.put(
         center: Enum.at(centers, 4),
         radius: @gauge_radius,
-        value: scene.assigns.volt,
+        value: normalize(scene.assigns.volt, 11.0, 15.0),
         min: 11.0,
         max: 15.0,
         title: "BATTERY VOLT",
         unit: "V",
-        formatter: fn v -> :erlang.float_to_binary(v, decimals: 1) end
+        formatter: fn _v -> maybe_float(scene.assigns.volt, 1) end
       )
       |> draw_status_card(Enum.at(centers, 5), scene.assigns.connected)
 
     push_graph(scene, graph)
-  end
-
-  defp next_value(value, dir) do
-    step = 0.02
-    next = value + step * dir
-
-    cond do
-      next >= 1.0 -> {1.0, -1}
-      next <= 0.0 -> {0.0, 1}
-      true -> {next, dir}
-    end
-  end
-
-  defp wave(value, phase) do
-    wrapped = value + phase
-    wrapped - :math.floor(wrapped)
   end
 
   defp draw_status_card(graph, {cx, cy}, connected) do
@@ -142,4 +125,17 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
     |> text("OBD STATUS", translate: {cx, cy - 30}, text_align: :center, font_size: 28, fill: :white)
     |> text(label, translate: {cx, cy + 20}, text_align: :center, font_size: 34, fill: color)
   end
+
+  defp normalize(nil, _min, _max), do: 0.0
+
+  defp normalize(value, min, max) when is_number(value) and max > min do
+    ratio = (value - min) / (max - min)
+    ratio |> max(0.0) |> min(1.0)
+  end
+
+  defp maybe_int(nil), do: "--"
+  defp maybe_int(value) when is_number(value), do: value |> trunc() |> Integer.to_string()
+
+  defp maybe_float(nil, _d), do: "--"
+  defp maybe_float(value, d) when is_number(value), do: :erlang.float_to_binary(value * 1.0, decimals: d)
 end
