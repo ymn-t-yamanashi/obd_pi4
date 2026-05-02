@@ -8,7 +8,7 @@ defmodule ObdPi4.Ui.Scene.Dashboard do
   alias ObdPi4.Ui.Gauge
   import Scenic.Primitives
 
-  @tick_ms 50
+  @tick_ms 16
   @gauge_radius 235
 
   @impl true

@@ -5,7 +5,7 @@ defmodule ObdPi4.Obd.Reader do
   alias ObdPi4.Obd.Parser
   alias ObdPi4.Obd.State
 
-  @interval_ms 50
+  @interval_ms 16
   @uart_speed 115_200
   @open_retry_ms 1_000
   @pid_map %{
@@ -15,7 +15,9 @@ defmodule ObdPi4.Obd.Reader do
     "010B" => :map_kpa,
     "0142" => :battery_v
   }
-  @pid_order ["010C", "0105", "010E", "010B", "0142"]
+  @fast_pid_order ["010E", "010B"]
+  @slow_pid_order ["0105", "0142"]
+  @slow_every 5
   @init_cmds ["ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP0"]
 
   def start_link(_opts), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -27,7 +29,9 @@ defmodule ObdPi4.Obd.Reader do
       uart: uart,
       device: System.get_env("OBD_DEVICE", "/dev/ttyUSB0"),
       ready: false,
-      pid_index: 0
+      fast_index: 0,
+      slow_index: 0,
+      tick: 0
     }
 
     send(self(), :connect)
@@ -41,7 +45,7 @@ defmodule ObdPi4.Obd.Reader do
         if init_adapter(state.uart) do
           State.set_status(:connected)
           Process.send_after(self(), :poll, @interval_ms)
-          {:noreply, %{state | ready: true, pid_index: 0}}
+          {:noreply, %{state | ready: true, fast_index: 0, slow_index: 0, tick: 0}}
         else
           UART.close(state.uart)
           State.set_status(:disconnected)
@@ -57,29 +61,46 @@ defmodule ObdPi4.Obd.Reader do
   end
 
   @impl true
-  def handle_info(:poll, %{ready: true, pid_index: idx} = state) do
-    pid = Enum.at(@pid_order, idx)
-    next_idx = rem(idx + 1, length(@pid_order))
+  def handle_info(:poll, %{ready: true, fast_index: f_idx, slow_index: s_idx, tick: tick} = state) do
+    fast_len = length(@fast_pid_order)
+    fast_pid = Enum.at(@fast_pid_order, f_idx)
+    next_fast_idx = rem(f_idx + 1, fast_len)
 
-    case query_pid(state.uart, pid) do
-      {:ok, val} ->
-        key = Map.fetch!(@pid_map, pid)
-        %{key => val} |> Parser.normalize() |> State.put()
+    case query_pid(state.uart, "010C") do
+      {:ok, rpm} ->
+        values = %{rpm: rpm}
+
+        values =
+          case query_pid(state.uart, fast_pid) do
+            {:ok, val} ->
+              Map.put(values, Map.fetch!(@pid_map, fast_pid), val)
+
+            _ ->
+              values
+          end
+
+        values =
+          if rem(tick, @slow_every) == 0 do
+            slow_pid = Enum.at(@slow_pid_order, s_idx)
+
+            case query_pid(state.uart, slow_pid) do
+              {:ok, val} -> Map.put(values, Map.fetch!(@pid_map, slow_pid), val)
+              _ -> values
+            end
+          else
+            values
+          end
+
+        values |> Parser.normalize() |> State.put()
         Process.send_after(self(), :poll, @interval_ms)
-        {:noreply, %{state | pid_index: next_idx}}
+        next_slow_idx = if rem(tick, @slow_every) == 0, do: rem(s_idx + 1, length(@slow_pid_order)), else: s_idx
+        {:noreply, %{state | fast_index: next_fast_idx, slow_index: next_slow_idx, tick: tick + 1}}
 
       _ ->
-        if pid == "010C" do
-          # RPM失敗は接続断の可能性が高いので即再接続
-          UART.close(state.uart)
-          State.set_status(:disconnected)
-          Process.send_after(self(), :connect, @open_retry_ms)
-          {:noreply, %{state | ready: false}}
-        else
-          # 一時的な失敗は他PIDを継続
-          Process.send_after(self(), :poll, @interval_ms)
-          {:noreply, %{state | pid_index: next_idx}}
-        end
+        UART.close(state.uart)
+        State.set_status(:disconnected)
+        Process.send_after(self(), :connect, @open_retry_ms)
+        {:noreply, %{state | ready: false}}
     end
   end
 

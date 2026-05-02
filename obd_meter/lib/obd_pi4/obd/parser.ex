@@ -8,13 +8,15 @@ defmodule ObdPi4.Obd.Parser do
   @battery_range {11.0, 15.0}
 
   def normalize(values) when is_map(values) do
-    %{
-      rpm: clamp_int(values[:rpm], @rpm_range),
-      coolant_temp_c: clamp_int(values[:coolant_temp_c], @coolant_range),
-      ignition_advance_deg: clamp_int(values[:ignition_advance_deg], @ignition_range),
-      map_kpa: clamp_int(values[:map_kpa], @map_range),
-      battery_v: clamp_float(values[:battery_v], @battery_range)
-    }
+    values
+    |> Enum.reduce(%{}, fn
+      {:rpm, v}, acc -> Map.put(acc, :rpm, clamp_int(v, @rpm_range))
+      {:coolant_temp_c, v}, acc -> Map.put(acc, :coolant_temp_c, clamp_int(v, @coolant_range))
+      {:ignition_advance_deg, v}, acc -> Map.put(acc, :ignition_advance_deg, clamp_int(v, @ignition_range))
+      {:map_kpa, v}, acc -> Map.put(acc, :map_kpa, clamp_int(v, @map_range))
+      {:battery_v, v}, acc -> Map.put(acc, :battery_v, clamp_float(v, @battery_range))
+      _, acc -> acc
+    end)
   end
 
   def parse_pid(pid, response) when is_binary(pid) and is_binary(response) do
